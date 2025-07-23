@@ -1,0 +1,1 @@
+from .css import carregar_css_global
