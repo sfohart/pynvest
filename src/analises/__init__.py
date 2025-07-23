@@ -1,5 +1,6 @@
 from .analise_historica import (
-    sinal_sma,
-    sinal_bollinger,
-    sinal_rsi
+    analisar_bandas_bollinger,
+    analisar_macd,
+    analisar_media_movel,
+    analisar_rsi
 )

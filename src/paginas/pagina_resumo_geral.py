@@ -1,4 +1,5 @@
 import pandas as pd
+import numpy as np
 import streamlit as st
 from st_aggrid import AgGrid, GridOptionsBuilder, GridUpdateMode, JsCode
 
@@ -7,9 +8,10 @@ import yfinance as yf
 import plotly.graph_objects as go
 
 from analises import (
-    sinal_sma,
-    sinal_rsi,
-    sinal_bollinger
+    analisar_bandas_bollinger,
+    analisar_macd,
+    analisar_media_movel,
+    analisar_rsi
 )
 
 def _preparar_dados(df):
@@ -371,65 +373,7 @@ def mostrar_resumo_investimentos(df: pd.DataFrame):
 
             dados = dados.dropna(subset=['Open', 'High', 'Low', 'Close'])
 
-
-            # Plot
-            st.markdown('#### Histórico de Preços')
-            fig_historico_precos = go.Figure()
-            fig_historico_precos.add_trace(go.Scatter(x=dados.index, y=dados["Close"], mode="lines", name=ticker))
-            fig_historico_precos.update_layout(
-                title=f"Histórico de Preços - {ticker}",
-                xaxis_title="Data",
-                yaxis_title="Preço de Fechamento (R$)",
-                template="plotly_white",
-                height=400
-            )
-            st.plotly_chart(fig_historico_precos, use_container_width=True, key=f'historico_precos_{ticker}')
-
-            st.markdown('#### Candlestick')
-            fig_historico_candlestick = go.Figure(data=[go.Candlestick(
-                x=dados.index,
-                open=dados['Open'],
-                high=dados['High'],
-                low=dados['Low'],
-                close=dados['Close'],
-                increasing_line_color='green',
-                decreasing_line_color='red',
-                name=ticker
-            )])
-
-            fig_historico_candlestick.update_layout(
-                title=f'Gráfico Candlestick - {ticker}',
-                xaxis_title='Data',
-                yaxis_title='Preço (R$)',
-                template='plotly_white',
-                height=500,
-                xaxis=dict(
-                    type='date',
-                    rangeslider=dict(visible=False)  # <-- aqui tira a barra/plot extra
-                )
-            )
-
-            st.plotly_chart(fig_historico_candlestick, use_container_width=True, key=f'historico_candlestick_{ticker}')
-
-
-            col_sma, col_rsi, col_bollinger = st.columns(3, border=True)
-            
-            with col_sma:
-                resultado = sinal_sma(ticker, dados)
-                label_sinal = "Sinal SMA"
-                _mostrar_sinal_compra_venda(ticker, resultado, label_sinal)
-
-            with col_rsi:
-                resposta = sinal_rsi(ticker, dados)
-                label_sinal = "Sinal RSI"
-                _mostrar_sinal_compra_venda(ticker, resultado, label_sinal)
-                pass
-
-            with col_bollinger:
-                resposta = sinal_bollinger(ticker, dados)
-                label_sinal = "Sinal Bollinger"
-                _mostrar_sinal_compra_venda(ticker, resultado, label_sinal)
-                pass
+            mostrar_analise_tecnica(dados)
 
             st.warning("""
                 ##### Atenção:               
@@ -442,34 +386,190 @@ def mostrar_resumo_investimentos(df: pd.DataFrame):
                """)
 
 
-def _mostrar_sinal_compra_venda(ticker: str, sinal: str, label_sinal: str):
-    if sinal == "Comprar":
-        st.metric(label=label_sinal, value="Comprar 🚀", delta="Positivo", delta_color="normal")
-    elif sinal == "Vender":
-        st.metric(label=label_sinal, value="Vender 🔻", delta="Negativo", delta_color="inverse")
-    else:
-        st.metric(label=label_sinal, value="Aguardar ⏸️")
-
-    if "SMA" in label_sinal:
-        st.write("""
-                * Essa técnica existe há décadas.
-                * A ideia é simples: quando a média móvel de curto prazo cruza para cima da média de longo prazo, indica força de alta (comprar). O contrário indica fraqueza (vender).
-                * É base para vários robôs e estratégias de trading.
-                 """)
-    elif "RSI" in label_sinal:
-        st.write("""
-                * Criado por J. Welles Wilder em 1978, o RSI é um dos osciladores mais populares.
-                * Valores abaixo de 30 indicam condição de sobrevenda (potencial compra), acima de 70, condição de sobrecompra (potencial venda).
-                * É usado para identificar reversões ou pontos de entrada/saída.
-                 """)
-    elif "Bollinger" in label_sinal:
-        st.write("""
-                * Desenvolvidas por John Bollinger nos anos 80.
-                * Usam a volatilidade (desvio padrão) para criar bandas que medem extremos de preço.
-                * Quando o preço toca ou ultrapassa a banda inferior, pode indicar sobrevenda; quando toca a banda superior, sobrecompra.
-                 """)
-        
+def mostrar_analise_tecnica(df):
+    st.title("Análise Técnica para Decisão de Compra/Venda")
     
+    # 1. Seletor de período
+    periodo = st.radio(
+        "Período de Análise:",
+        options=["1 mês", "3 meses", "6 meses", "1 ano", "Máximo"],
+        index=2,  # 6M como padrão
+        horizontal=True,
+        help="Selecione o período histórico para análise"
+    )
+    
+    # Mapeamento para o parâmetro do Yahoo Finance
+    period_map = {
+        "1 mês": 30,
+        "3 meses": 90,
+        "6 meses": 180,
+        "1 ano": 365,
+        "Máximo": None
+    }
+    
+    # 2. Calcular todos os indicadores
+    try:
+        dados = df.copy()
+                
+        # Aplicar o período selecionado (se não for o máximo)
+        if periodo != "Máximo":
+            dias = period_map[periodo]
+            start_date = pd.Timestamp.now() - pd.Timedelta(days=dias)
+            dados = dados[dados.index >= start_date]
+        
+        sinal_sma, dados_sma = analisar_media_movel(dados)
+        sinal_rsi, dados_rsi = analisar_rsi(dados)
+        sinal_bb, dados_bb = analisar_bandas_bollinger(dados)
+        sinal_macd, dados_macd = analisar_macd(dados)
+        
+    except Exception as e:
+        st.error(f"Erro ao processar dados: {str(e)}")
+        return
+    
+    # 3. Gráfico principal combinado
+    with st.container(border=True):
+        st.markdown(f"### Visão Integrada - Período: {periodo}")
+        fig_principal = criar_grafico_principal(dados)
+        st.plotly_chart(fig_principal, use_container_width=True)
+    
+    # 4. Análises individuais em 2 colunas
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        # Médias Móveis
+        with st.container(border=True):
+            st.markdown("#### Médias Móveis")
+            st.metric("Sinal", sinal_sma)
+            fig_sma = go.Figure()
+            fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['Close'], name='Preço', line=dict(color='gray', width=1)))
+            fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['SMA_curta'], name='SMA 20', line=dict(color='orange', width=2)))
+            fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['SMA_longa'], name='SMA 50', line=dict(color='blue', width=2)))
+            st.plotly_chart(fig_sma, use_container_width=True)
+        
+        # RSI
+        with st.container(border=True):
+            st.markdown("#### Índice de Força Relativa (RSI)")
+            st.metric("Sinal", sinal_rsi)
+            fig_rsi = go.Figure()
+            fig_rsi.add_trace(go.Scatter(x=dados_rsi.index, y=dados_rsi['RSI'], name='RSI', line=dict(color='purple', width=2)))
+            fig_rsi.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Sobre-vendido")
+            fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Sobre-comprado")
+            st.plotly_chart(fig_rsi, use_container_width=True)
+    
+    with col2:
+        # Bandas de Bollinger
+        with st.container(border=True):
+            st.markdown("#### Bandas de Bollinger")
+            st.metric("Sinal", sinal_bb)
+            fig_bb = go.Figure()
+            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Close'], name='Preço', line=dict(color='gray', width=1)))
+            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Banda_Superior'], name='Banda Superior', line=dict(color='red', width=1)))
+            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['SMA'], name='Média', line=dict(color='blue', width=1)))
+            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Banda_Inferior'], name='Banda Inferior', line=dict(color='green', width=1)))
+            st.plotly_chart(fig_bb, use_container_width=True)
+        
+        # MACD
+        with st.container(border=True):
+            st.markdown("#### MACD")
+            st.metric("Sinal", sinal_macd)
+            fig_macd = go.Figure()
+            fig_macd.add_trace(go.Scatter(x=dados_macd.index, y=dados_macd['MACD'], name='MACD', line=dict(color='blue', width=2)))
+            fig_macd.add_trace(go.Scatter(x=dados_macd.index, y=dados_macd['Sinal'], name='Linha Sinal', line=dict(color='orange', width=2)))
+            fig_macd.add_bar(
+                x=dados_macd.index, 
+                y=dados_macd['MACD']-dados_macd['Sinal'], 
+                name='Histograma', 
+                marker_color=np.where((dados_macd['MACD']-dados_macd['Sinal']) > 0, 'green', 'red')
+            )
+            st.plotly_chart(fig_macd, use_container_width=True)
+    
+    # Nota importante
+    st.info("""
+    **Nota:** Os indicadores técnicos são recalculados automaticamente quando você altera o período de análise.
+    Períodos mais longos mostram tendências gerais, enquanto períodos curtos revelam oportunidades de curto prazo.
+    """)
+
+def criar_grafico_principal(dados):
+    fig = go.Figure()
+    
+    # Candlestick
+    fig.add_trace(go.Candlestick(
+        x=dados.index,
+        open=dados['Open'],
+        high=dados['High'],
+        low=dados['Low'],
+        close=dados['Close'],
+        name='Preço',
+        increasing_line_color='#2ecc71',
+        decreasing_line_color='#e74c3c'
+    ))
+    
+    # Adicionar indicadores
+    if 'SMA_curta' in dados.columns:
+        fig.add_trace(go.Scatter(
+            x=dados.index, y=dados['SMA_curta'],
+            name='SMA 20',
+            line=dict(color='#f39c12', width=2)
+        ))
+        fig.add_trace(go.Scatter(
+            x=dados.index, y=dados['SMA_longa'],
+            name='SMA 50', 
+            line=dict(color='#3498db', width=2)
+        ))
+    
+    if 'Banda_Superior' in dados.columns:
+        fig.add_trace(go.Scatter(
+            x=dados.index, y=dados['Banda_Superior'],
+            name='B. Superior',
+            line=dict(color='#e74c3c', width=1, dash='dot')
+        ))
+        fig.add_trace(go.Scatter(
+            x=dados.index, y=dados['Banda_Inferior'],
+            name='B. Inferior',
+            line=dict(color='#2ecc71', width=1, dash='dot')
+        ))
+    
+    fig.update_layout(
+        height=500,
+        xaxis_rangeslider_visible=False,
+        legend=dict(
+            orientation="h",
+            yanchor="bottom",
+            y=1.02,
+            xanchor="right",
+            x=1
+        ),
+        margin=dict(t=40, l=40, r=40, b=40),
+        hovermode="x unified"
+    )
+    
+    return fig
+
+def criar_grafico_principal(dados):
+    fig = go.Figure()
+    
+    # Candlestick
+    fig.add_trace(go.Candlestick(
+        x=dados.index, open=dados['Open'], high=dados['High'],
+        low=dados['Low'], close=dados['Close'], name='Preço'
+    ))
+    
+    # Adicionar todos os indicadores principais
+    if 'SMA_curta' in dados.columns:
+        fig.add_trace(go.Scatter(x=dados.index, y=dados['SMA_curta'], name='SMA 20', line=dict(color='orange', width=1.5)))
+        fig.add_trace(go.Scatter(x=dados.index, y=dados['SMA_longa'], name='SMA 50', line=dict(color='blue', width=1.5)))
+    
+    if 'Banda_Superior' in dados.columns:
+        fig.add_trace(go.Scatter(x=dados.index, y=dados['Banda_Superior'], name='Bollinger Superior', line=dict(color='red', width=1, dash='dot')))
+        fig.add_trace(go.Scatter(x=dados.index, y=dados['Banda_Inferior'], name='Bollinger Inferior', line=dict(color='green', width=1, dash='dot')))
+    
+    fig.update_layout(
+        height=500,
+        xaxis_rangeslider_visible=False,
+        legend=dict(orientation="h", yanchor="bottom", y=1.02),
+        margin=dict(t=40, l=40, r=40, b=40)
+    )
+    return fig
     
 
 
