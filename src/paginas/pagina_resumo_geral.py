@@ -384,8 +384,7 @@ def mostrar_resumo_investimentos(df: pd.DataFrame):
                 * Indicadores técnicos normalmente são mais efetivos combinados 
                 entre si e com análise fundamentalista.
                """)
-
-
+            
 def mostrar_analise_tecnica(df):
     st.title("Análise Técnica para Decisão de Compra/Venda")
     
@@ -426,68 +425,118 @@ def mostrar_analise_tecnica(df):
         st.error(f"Erro ao processar dados: {str(e)}")
         return
     
+    # Função para formatar o delta corretamente para o Streamlit
+    def formatar_delta(sinal):
+        if "Compra" in sinal:
+            return f"↑ {sinal}", "compra", "normal"  # Texto, delta, delta_color
+        elif "Venda" in sinal:
+            return f"↓ {sinal}", "venda", "inverse"  # Texto, delta, delta_color
+        else:
+            return sinal, "aguarde", "off"  # Texto, delta vazio, delta_color off
+    
     # 3. Gráfico principal combinado
-    with st.container(border=True):
-        st.markdown(f"### Visão Integrada - Período: {periodo}")
+    with st.expander("📊 Visão Integrada - Gráfico Principal", expanded=True):
+        st.markdown(f"**Período selecionado:** {periodo}")
         fig_principal = criar_grafico_principal(dados)
         st.plotly_chart(fig_principal, use_container_width=True)
     
     # 4. Análises individuais em 2 colunas
     col1, col2 = st.columns(2)
+
     
     with col1:
         # Médias Móveis
-        with st.container(border=True):
-            st.markdown("#### Médias Móveis")
-            st.metric("Sinal", sinal_sma)
-            fig_sma = go.Figure()
-            fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['Close'], name='Preço', line=dict(color='gray', width=1)))
-            fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['SMA_curta'], name='SMA 20', line=dict(color='orange', width=2)))
-            fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['SMA_longa'], name='SMA 50', line=dict(color='blue', width=2)))
-            st.plotly_chart(fig_sma, use_container_width=True)
+        with st.expander("📈 Médias Móveis (SMA)", expanded=True):
+            st.markdown("""
+            **Sobre Médias Móveis:**  
+            As Médias Móveis suavizam os dados de preço para identificar tendências.  
+            - **SMA 20:** Média de 20 períodos (curto prazo)  
+            - **SMA 50:** Média de 50 períodos (médio prazo)  
+            **Sinal de compra:** Quando a SMA curta cruza acima da SMA longa  
+            **Sinal de venda:** Quando a SMA curta cruza abaixo da SMA longa
+            """)
+            texto_sma, delta_sma, cor_sma = formatar_delta(sinal_sma)
+            st.metric("Sinal", texto_sma, delta=delta_sma, delta_color=cor_sma)
+            with st.expander('Dados', expanded=False):
+                fig_sma = go.Figure()
+                fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['Close'], name='Preço', line=dict(color='gray', width=1)))
+                fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['SMA_curta'], name='SMA 20', line=dict(color='orange', width=2)))
+                fig_sma.add_trace(go.Scatter(x=dados_sma.index, y=dados_sma['SMA_longa'], name='SMA 50', line=dict(color='blue', width=2)))
+                st.plotly_chart(fig_sma, use_container_width=True)
         
         # RSI
-        with st.container(border=True):
-            st.markdown("#### Índice de Força Relativa (RSI)")
-            st.metric("Sinal", sinal_rsi)
-            fig_rsi = go.Figure()
-            fig_rsi.add_trace(go.Scatter(x=dados_rsi.index, y=dados_rsi['RSI'], name='RSI', line=dict(color='purple', width=2)))
-            fig_rsi.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Sobre-vendido")
-            fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Sobre-comprado")
-            st.plotly_chart(fig_rsi, use_container_width=True)
+        with st.expander("📊 Índice de Força Relativa (RSI)", expanded=True):
+            st.markdown("""
+            **Sobre o RSI:**  
+            O RSI mede a velocidade e mudança dos movimentos de preço (0-100).  
+            - **Acima de 70:** Ativo pode estar sobrecomprado (sinal de venda)  
+            - **Abaixo de 30:** Ativo pode estar sobrevendido (sinal de compra)  
+            Ideal para identificar condições extremas do mercado.
+            """)
+            texto_rsi, delta_rsi, cor_rsi = formatar_delta(sinal_rsi)
+            st.metric("Sinal", texto_rsi, delta=delta_rsi, delta_color=cor_rsi)
+            with st.expander('Dados', expanded=False):
+                fig_rsi = go.Figure()
+                fig_rsi.add_trace(go.Scatter(x=dados_rsi.index, y=dados_rsi['RSI'], name='RSI', line=dict(color='purple', width=2)))
+                fig_rsi.add_hline(y=30, line_dash="dash", line_color="green", annotation_text="Sobre-vendido")
+                fig_rsi.add_hline(y=70, line_dash="dash", line_color="red", annotation_text="Sobre-comprado")
+                st.plotly_chart(fig_rsi, use_container_width=True)
     
     with col2:
         # Bandas de Bollinger
-        with st.container(border=True):
-            st.markdown("#### Bandas de Bollinger")
-            st.metric("Sinal", sinal_bb)
-            fig_bb = go.Figure()
-            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Close'], name='Preço', line=dict(color='gray', width=1)))
-            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Banda_Superior'], name='Banda Superior', line=dict(color='red', width=1)))
-            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['SMA'], name='Média', line=dict(color='blue', width=1)))
-            fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Banda_Inferior'], name='Banda Inferior', line=dict(color='green', width=1)))
-            st.plotly_chart(fig_bb, use_container_width=True)
+        with st.expander("📉 Bandas de Bollinger", expanded=True):
+            st.markdown("""
+            **Sobre Bandas de Bollinger:**  
+            Mostram a volatilidade e níveis de preço relativos.  
+            - **Banda Superior:** SMA + 2 desvios padrão  
+            - **Banda Inferior:** SMA - 2 desvios padrão  
+            **Sinal de compra:** Quando o preço toca a banda inferior  
+            **Sinal de venda:** Quando o preço toca a banda superior  
+            Contração das bandas indica baixa volatilidade.
+            """)
+            texto_bb, delta_bb, cor_bb = formatar_delta(sinal_bb)
+            st.metric("Sinal", texto_bb, delta=delta_bb, delta_color=cor_bb)
+            with st.expander('Dados', expanded=False):
+                fig_bb = go.Figure()
+                fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Close'], name='Preço', line=dict(color='gray', width=1)))
+                fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Banda_Superior'], name='Banda Superior', line=dict(color='red', width=1)))
+                fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['SMA'], name='Média', line=dict(color='blue', width=1)))
+                fig_bb.add_trace(go.Scatter(x=dados_bb.index, y=dados_bb['Banda_Inferior'], name='Banda Inferior', line=dict(color='green', width=1)))
+                st.plotly_chart(fig_bb, use_container_width=True)
         
         # MACD
-        with st.container(border=True):
-            st.markdown("#### MACD")
-            st.metric("Sinal", sinal_macd)
-            fig_macd = go.Figure()
-            fig_macd.add_trace(go.Scatter(x=dados_macd.index, y=dados_macd['MACD'], name='MACD', line=dict(color='blue', width=2)))
-            fig_macd.add_trace(go.Scatter(x=dados_macd.index, y=dados_macd['Sinal'], name='Linha Sinal', line=dict(color='orange', width=2)))
-            fig_macd.add_bar(
-                x=dados_macd.index, 
-                y=dados_macd['MACD']-dados_macd['Sinal'], 
-                name='Histograma', 
-                marker_color=np.where((dados_macd['MACD']-dados_macd['Sinal']) > 0, 'green', 'red')
-            )
-            st.plotly_chart(fig_macd, use_container_width=True)
+        with st.expander("📈 MACD (Convergência/Divergência de Médias Móveis)", expanded=True):
+            st.markdown("""
+            **Sobre o MACD:**  
+            Mostra a relação entre duas médias móveis do preço.  
+            - **MACD:** Diferença entre EMA 12 e EMA 26  
+            - **Linha Sinal:** EMA 9 do MACD  
+            **Sinal de compra:** Quando o MACD cruza acima da linha de sinal  
+            **Sinal de venda:** Quando o MACD cruza abaixo da linha de sinal  
+            O histograma mostra a diferença entre as linhas.
+            """)
+            texto_macd, delta_macd, cor_macd = formatar_delta(sinal_macd)
+            st.metric("Sinal", texto_macd, delta=delta_macd, delta_color=cor_macd)
+            with st.expander('Dados', expanded=False):
+                fig_macd = go.Figure()
+                fig_macd.add_trace(go.Scatter(x=dados_macd.index, y=dados_macd['MACD'], name='MACD', line=dict(color='blue', width=2)))
+                fig_macd.add_trace(go.Scatter(x=dados_macd.index, y=dados_macd['Sinal'], name='Linha Sinal', line=dict(color='orange', width=2)))
+                fig_macd.add_bar(
+                    x=dados_macd.index, 
+                    y=dados_macd['MACD']-dados_macd['Sinal'], 
+                    name='Histograma', 
+                    marker_color=np.where((dados_macd['MACD']-dados_macd['Sinal']) > 0, 'green', 'red')
+                )
+                st.plotly_chart(fig_macd, use_container_width=True)
     
     # Nota importante
     st.info("""
-    **Nota:** Os indicadores técnicos são recalculados automaticamente quando você altera o período de análise.
-    Períodos mais longos mostram tendências gerais, enquanto períodos curtos revelam oportunidades de curto prazo.
+    **📌 Nota Importante:**  
+    - Os indicadores técnicos são recalculados automaticamente quando você altera o período de análise.  
+    - Períodos mais longos mostram tendências gerais, enquanto períodos curtos revelam oportunidades de curto prazo.  
+    - Recomenda-se usar múltiplos indicadores para confirmar os sinais antes de tomar decisões de investimento.
     """)
+
 
 def criar_grafico_principal(dados):
     fig = go.Figure()

@@ -79,6 +79,11 @@ def carregar_movimentacoes(path_planilha: str) -> pd.DataFrame:
         df_movimentacoes.insert(posicao_produto, 'Descrição', df_movimentacoes.pop('Descrição'))
         df_movimentacoes.insert(posicao_produto, 'Ticker', df_movimentacoes.pop('Ticker'))
 
+    colunas_necessarias = ['Ticker', 'Descrição']
+    if all(col in df_movimentacoes.columns for col in colunas_necessarias):
+        df_movimentacoes['Tipo de Ativo'] = df_movimentacoes.apply(_classificar_ativo_b3, axis=1)
+
+
     # Padroniza 'Entrada/Saída' para capitalizar e tirar espaços
     df_movimentacoes['Entrada/Saída'] = df_movimentacoes['Entrada/Saída'].str.strip().str.capitalize()
 
@@ -130,3 +135,43 @@ def ajustar_movimentacoes_por_eventos(df_mov: pd.DataFrame, df_eventos: pd.DataF
     df_mov.reset_index(drop=True, inplace=True)
     return df_mov
 
+def _classificar_ativo_b3(row):
+    ticker = str(row['Ticker']).upper()
+    descricao = str(row['Descrição']).upper()
+
+    # Fundos Imobiliários
+    if ticker.endswith('11') and ('FII' in descricao or 'IMOBILIÁRIO' in descricao):
+        return 'FII'
+
+    # ETFs
+    if ticker.endswith('11') and ('ETF' in descricao or 'ÍNDICE' in descricao):
+        return 'ETF'
+
+    # BDRs
+    if ticker.endswith(('34', '35', '32', '39')) or 'BDR' in descricao:
+        return 'BDR'
+
+    # Ações ON/PN
+    if ticker.endswith('3'):
+        return 'Ação ON'
+    if ticker.endswith('4'):
+        return 'Ação PN'
+
+    # Units
+    if ticker.endswith('11') and ('UNIT' in descricao or 'UNITS' in descricao):
+        return 'Unit'
+
+    # Opções
+    if len(ticker) >= 5 and ticker[-1].isdigit() and ticker[-2].isalpha():
+        return 'Opção'
+
+    # Renda Fixa Pública
+    if any(p in descricao for p in ['TESOURO', 'LTN', 'NTN', 'LFT']):
+        return 'Tesouro Direto'
+
+    # Renda Fixa Privada
+    if any(p in descricao for p in ['DEBENTURE', 'CRI', 'CRA', 'CDB']):
+        return 'Renda Fixa Privada'
+
+    # Fallback
+    return 'Outro'
