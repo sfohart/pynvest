@@ -1,2 +1,2 @@
-from .pagina_resumo_geral import pagina_resumo_geral
-from .pagina_analises import pagina_analises
+from .pagina_fii import pagina_fii
+from .pagina_acoes import pagina_acoes

@@ -1,7 +1,9 @@
 from preprocessamento import (
     carregar_movimentacoes, 
     carregar_movimentacoes_streamlit,
-    carregar_fusoes_desdobramentos
+    carregar_fusoes_desdobramentos,
+    filtrar_fii,
+    filtrar_acoes
 )
 
 import streamlit as st
@@ -10,10 +12,12 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 
 import os
 import tempfile
+import pandas as pd
 
 
 from paginas import (
-    pagina_resumo_geral
+    pagina_fii,
+    pagina_acoes
 )
 
 from utils import carregar_css_global
@@ -23,20 +27,38 @@ carregar_css_global()
 # Ajusta o locale para pt_BR - isso depende do seu sistema
 import locale
 try:
-    locale.setlocale(locale.LC_TIME, 'pt_BR.UTF-8')
+    locale.setlocale(locale.LC_ALL, 'pt_BR.UTF-8')
 except locale.Error:
     # Se não funcionar, tenta pt_BR ou ignora
     try:
-        locale.setlocale(locale.LC_TIME, 'pt_BR')
+        locale.setlocale(locale.LC_ALL, 'pt_BR')
     except locale.Error:
         pass  # fallback se locale não estiver instalado
 
 # definindo caminho dos arquivos
 dir_dados = 'dados'
+path_segmentos_fii_status_invest = os.path.join(dir_dados, 'segmentos_fii_status_invest.csv') 
 path_planilha_b3 = os.path.join(dir_dados, 'movimentacao-b3.xlsx') 
-path_fusoes_desdobramentos = os.path.join(dir_dados, 'fusoes_desdobramentos.csv') 
+path_fusoes_desdobramentos = os.path.join(dir_dados, 'fusoes_desdobramentos.csv')
 
 
+# carregar as planilhas antes de usar o site
+if not st.session_state.get('upload_concluido', False):
+    st.write("Dialog should appear")
+    carregar_movimentacoes_streamlit(path_fusoes_desdobramentos)
+    st.stop()
+
+df_movimentacoes = st.session_state['dados-movimentacoes']
+df_fusoes_desdobramentos = st.session_state['dados-fusoes']
+
+
+
+
+print(' ------------------------- df_movimentacoes -------------------------')
+df_movimentacoes.info()
+
+print(' ------------------------- df_fusoes_desdobramentos -------------------------')
+df_fusoes_desdobramentos.info()
 
 # Configurações iniciais da página
 st.set_page_config(
@@ -46,53 +68,94 @@ st.set_page_config(
 )
 
 
-df_fusoes_desdobramentos = carregar_fusoes_desdobramentos(path_fusoes_desdobramentos)
+# definindo o tema do menu
+# CSS dinâmico com suporte a tema escuro/claro
+st.markdown("""
+    <style>
+        /* Tema Claro */
+        @media (prefers-color-scheme: light) {
+            .sidebar-container {
+                background-color: #FFFFFF !important;
+            }
+            .sidebar-container .nav-link {
+                color: black !important;
+            }
+            .sidebar-container .nav-link:hover {
+                background-color: #D3D3D3 !important;
+            }
+            .sidebar-container .nav-link.active {
+                background-color: #ADD8E6 !important;
+            }
+        }
+
+        /* Tema Escuro */
+        @media (prefers-color-scheme: dark) {
+            .sidebar-container {
+                background-color: #0E1117 !important;
+            }
+            .sidebar-container .nav-link {
+                color: white !important;
+            }
+            .sidebar-container .nav-link:hover {
+                background-color: #2E4053 !important;
+            }
+            .sidebar-container .nav-link.active {
+                background-color: #2E4053 !important;
+            }
+        }
+    </style>
+""", unsafe_allow_html=True)
 
 
 # Título principal
 st.title("📈 Acompanhamento de Investimentos")
 
-# Menu lateral estilizado
+# Sidebar com estilos adaptados (aplica classe personalizada)
 with st.sidebar:
     menu = option_menu(
         menu_title="Menu Principal",
-        options=["Resumo Geral", "Análises", "Configurações"],
-        icons=["graph-up", "clipboard-chart", "gear"],
+        options=["Inicio", "Ações", "Fundos Imobiliários", "Configurações"],
+        icons=["house", "graph-up", "bi-building", "gear"],
         menu_icon="cast",
         default_index=0,
         styles={
-            "container": {"padding": "5px", "background-color": "#0E1117"},
-            "icon": {"color": "orange", "font-size": "18px"}, 
+            "container": {"padding": "5px", "class": "sidebar-container"},  # classe personalizada
+            "icon": {"color": "orange", "font-size": "18px"},
             "nav-link": {
                 "font-size": "16px",
                 "text-align": "left",
                 "margin": "0px",
-                "--hover-color": "#2E4053",
             },
-            "nav-link-selected": {"background-color": "#2E4053"},
-        }
+            "nav-link-selected": {
+                "color": "inherit",  # herdado do tema
+            },
+        },
     )
 
+
+# Conteúdo dinâmico conforme menu selecionado
+if menu == "Inicio":
+    st.header("🏠 Início")
+
 # Conteúdo dinâmico com base no menu
-if menu == "Resumo Geral":
-    st.header("📊 Resumo Geral")
-    st.info("Aqui você verá o total investido, posição atual e lucro/prejuízo.")
-
-    df_movimentacoes = carregar_movimentacoes_streamlit(path_planilha_b3, path_fusoes_desdobramentos)
+elif menu == "Ações":
+    st.header("📊 Ações")
+    
     if df_movimentacoes is not None:
-        df_movimentacoes.info()
-        pagina_resumo_geral(df_movimentacoes)
+        df_acoes = filtrar_acoes(df_movimentacoes)
+        
+        print(f'Valor das Operacoes: {df_acoes['Valor da Operação'].sum():,.2f}')
+        pagina_acoes(df_acoes)
 
     
-elif menu == "Importar Operações":
-    st.header("📈 Análises")
-    st.info("Aqui você poderá analisar os ativos.")
-    
-    df_movimentacoes = carregar_movimentacoes(path_planilha_b3)
-    if df_movimentacoes is None:
-        df_movimentacoes = carregar_movimentacoes_streamlit(path_planilha_b3, path_fusoes_desdobramentos)
-
-    pagina_resumo_geral(df_movimentacoes, df_fusoes_desdobramentos)
+elif menu == "Fundos Imobiliários":
+    st.header("🏢 Fundos Imobiliários")
+        
+    if df_movimentacoes is not None:
+        df_fii = filtrar_fii(df_movimentacoes)
+        print(f'Valor das Operacoes: {df_fii['Valor da Operação'].sum():,.2f}')
+        pagina_fii(df_fii)
+        
 
 elif menu == "Configurações":
     st.header("⚙️ Configurações")

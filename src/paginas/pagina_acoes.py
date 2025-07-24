@@ -220,8 +220,6 @@ def grafico_patrimonio_donut(total_investido, lucro_prejuizo, key=None, height_d
 
 
 def mostrar_resumo_investimentos(df: pd.DataFrame):
-
-
     df = df.copy()
 
     total_investido_geral = 0
@@ -280,14 +278,17 @@ def mostrar_resumo_investimentos(df: pd.DataFrame):
 
     df_resumo = pd.DataFrame(resumo)
     df_resumo_formatted = df_resumo.copy()
+    
+    df_resumo_formatted = df_resumo_formatted.sort_values(by=['Ticker'], ascending=True) if not df_resumo_formatted.empty else df_resumo_formatted
 
     # Formatar colunas numéricas para string em pt-BR com 2 casas decimais
     cols_moeda = ["Preço Médio", "Preço Atual", "Total Investido", "Valor de Mercado", "Lucro/Prejuízo"]
 
-    for col in cols_moeda:
-        df_resumo_formatted[col] = df_resumo_formatted[col].apply(
-            lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
-        )
+    if not df_resumo_formatted.empty:
+        for col in cols_moeda:
+            df_resumo_formatted[col] = df_resumo_formatted[col].apply(
+                lambda x: f"R$ {x:,.2f}".replace(",", "X").replace(".", ",").replace("X", ".")
+            )
 
     # KPIs gerais
     lucro_total = total_valor_mercado - total_investido_geral
@@ -622,7 +623,7 @@ def criar_grafico_principal(dados):
     
 
 
-def pagina_resumo_geral(df_movimentacoes: pd.DataFrame):
+def pagina_acoes(df_movimentacoes: pd.DataFrame):
     df = df_movimentacoes.copy(deep=True)
 
     st.markdown("### 📊 Resumo Geral")
@@ -644,6 +645,7 @@ def pagina_resumo_geral(df_movimentacoes: pd.DataFrame):
 
     with st.expander('#### Informações Básicas', expanded=False):
         mostrar_resumo_investimentos(df)
+
     
     # Verificação de datas inválidas
     if isinstance(df, pd.DataFrame) and 'Data' in df.columns:

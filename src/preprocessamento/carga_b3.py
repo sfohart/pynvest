@@ -1,10 +1,79 @@
 import pandas as pd
 import os
+import re
 
 import streamlit as st
 import tempfile
 
-def carregar_movimentacoes_streamlit(path_planilha: str, path_fusoes_desdobramentos: str):
+from utils import parse_from_string_to_numeric
+
+####################################################################################################################################
+# Funções auxiliares
+####################################################################################################################################
+
+    
+def classificar_ativo_b3(row):
+    ticker = str(row['Ticker']).upper()
+    descricao = str(row['Descrição']).upper()
+
+    # Fundos Imobiliários (FII) - mais variações comuns na descrição
+    if ticker.endswith('11') and any(
+        x in descricao for x in ['FII', 'FDO INV IMOB', 'FUNDO DE INVESTIMENTO IMOB', 'IMOBILIÁRIO']):
+        return 'FII'
+
+    # ETFs
+    if ticker.endswith('11') and any(x in descricao for x in ['ETF', 'ÍNDICE']):
+        return 'ETF'
+
+    # BDRs
+    if ticker.endswith(('34', '35', '32', '39')) or 'BDR' in descricao:
+        return 'BDR'
+
+    # Ações ON/PN
+    if ticker.endswith('3'):
+        return 'Ação ON'
+    if ticker.endswith('4'):
+        return 'Ação PN'
+
+    # Units
+    if ticker.endswith('11') and any(x in descricao for x in ['UNIT', 'UNITS']):
+        return 'Unit'
+
+    # Opções
+    if len(ticker) >= 5 and ticker[-1].isdigit() and ticker[-2].isalpha():
+        return 'Opção'
+
+    # Renda Fixa Pública
+    if any(p in descricao for p in ['TESOURO', 'LTN', 'NTN', 'LFT']):
+        return 'Tesouro Direto'
+
+    # Renda Fixa Privada
+    if any(p in descricao for p in ['DEBENTURE', 'CRI', 'CRA', 'CDB']):
+        return 'Renda Fixa Privada'
+
+    # Fallback
+    return 'Outro'
+
+def identificar_tipo(row) -> str:
+    ticker = str(row['Ticker']).upper()
+    descricao = str(row['Descrição']).upper()
+    produto = str(row['Produto']).upper()
+
+    if ticker.endswith('11'):
+        return 'FII'
+    elif ticker.endswith(('3', '4', '5', '6')):
+        return 'Ações'
+    elif 'CDB' in produto:
+        return 'CDB'
+    else:
+        return 'Outros'
+    
+####################################################################################################################################
+# Funções principais
+####################################################################################################################################
+
+@st.dialog('Faça o Upload do Extrato da B3')
+def carregar_movimentacoes_streamlit(path_fusoes_desdobramentos: str):
     """
     Componente Streamlit para upload de arquivo que retorna o DataFrame processado
     ou None se nenhum arquivo for carregado.
@@ -38,19 +107,20 @@ def carregar_movimentacoes_streamlit(path_planilha: str, path_fusoes_desdobramen
                 pass
             
             # Verifica se o processamento foi bem sucedido
-            if isinstance(df_movimentacoes, pd.DataFrame) and not df_movimentacoes.empty:
-                st.success("Arquivo carregado e processado com sucesso!")                
-                df_movimentacoes.to_excel(path_planilha, header=True)
-                return df_movimentacoes
+            if isinstance(df_movimentacoes, pd.DataFrame) and not df_movimentacoes.empty \
+                and isinstance(df_fusoes_desdobramentos, pd.DataFrame) and not df_fusoes_desdobramentos.empty:
+                st.success("Arquivo carregado e processado com sucesso!")                                
+                st.session_state['dados-movimentacoes'] = df_movimentacoes
+                st.session_state['dados-fusoes'] = df_fusoes_desdobramentos
+                st.session_state['upload_concluido'] = True
+                st.rerun()
+                
             else:
-                st.error("O arquivo foi carregado mas não pôde ser processado.")
-                return None
+                st.error("O arquivo foi carregado mas não pôde ser processado.")                
                 
         except Exception as e:
             st.error(f"Erro ao processar arquivo: {str(e)}")
-            return None
-    
-    return None
+
 
 
 def carregar_movimentacoes(path_planilha: str) -> pd.DataFrame:
@@ -60,34 +130,59 @@ def carregar_movimentacoes(path_planilha: str) -> pd.DataFrame:
     # Suprimir o aviso específico
     warnings.filterwarnings('ignore', category=UserWarning, module='openpyxl.styles.stylesheet')
 
-    df_movimentacoes = pd.read_excel(path_planilha)
+    df = pd.read_excel(path_planilha, dtype=str)
 
     # Converte a coluna Data para datetime
-    df_movimentacoes['Data'] = pd.to_datetime(
-        df_movimentacoes['Data'], 
+    df['Data'] = pd.to_datetime(
+        df['Data'], 
         format='%d/%m/%Y',  # Formato brasileiro
         errors='coerce'     # Converte datas inválidas para NaT
     )
 
+
+    
     # Se existir a coluna 'Produto', divide em 'Ticker' e 'Descrição'
-    if 'Produto' in df_movimentacoes.columns:
-        df_movimentacoes[['Ticker', 'Descrição']] = df_movimentacoes['Produto'].str.split(' - ', n=1, expand=True)
-        df_movimentacoes['Ticker'] = df_movimentacoes['Ticker'].str.strip()
-        df_movimentacoes['Descrição'] = df_movimentacoes['Descrição'].str.strip()
-        posicao_produto = df_movimentacoes.columns.get_loc('Produto')
-        df_movimentacoes.drop('Produto', axis=1, inplace=True)
-        df_movimentacoes.insert(posicao_produto, 'Descrição', df_movimentacoes.pop('Descrição'))
-        df_movimentacoes.insert(posicao_produto, 'Ticker', df_movimentacoes.pop('Ticker'))
+    if 'Produto' in df.columns:
+        df[['Ticker', 'Descrição']] = df['Produto'].str.split(' - ', n=1, expand=True)
+        df['Ticker'] = df['Ticker'].str.strip()
+        df['Descrição'] = df['Descrição'].str.strip()
+        posicao_produto = df.columns.get_loc('Produto')
+        #df.drop('Produto', axis=1, inplace=True)
+        df.insert(posicao_produto + 1, 'Ticker', df.pop('Ticker'))
+        df.insert(posicao_produto + 2, 'Descrição', df.pop('Descrição'))
 
     colunas_necessarias = ['Ticker', 'Descrição']
-    if all(col in df_movimentacoes.columns for col in colunas_necessarias):
-        df_movimentacoes['Tipo de Ativo'] = df_movimentacoes.apply(_classificar_ativo_b3, axis=1)
-
+    if all(col in df.columns for col in colunas_necessarias):
+        df['Tipo de Ativo'] = df.apply(classificar_ativo_b3, axis=1)
 
     # Padroniza 'Entrada/Saída' para capitalizar e tirar espaços
-    df_movimentacoes['Entrada/Saída'] = df_movimentacoes['Entrada/Saída'].str.strip().str.capitalize()
+    df['Entrada/Saída'] = df['Entrada/Saída'].str.strip().str.capitalize()
 
-    return df_movimentacoes
+    # Define quais tipos são considerados compra ou venda
+    tipos_compra_venda = [
+        'Compra',
+        'Venda',
+        'Transferência - Liquidação',
+        # esses dois aqui abaixo não aparecem, quando filtramos por "Compra/Venda"
+        # ao puxar um extrato de movimentações na B3
+        # 'Leilão de Fração',
+        # 'Resgate',
+    ]
+
+    df['Compra/Venda'] = df['Movimentação'].isin(tipos_compra_venda)
+
+    colunas_monetarias = ['Valor da Operação', 'Preço unitário','Quantidade']
+    if all(col in df.columns for col in colunas_monetarias):
+        for col in colunas_monetarias:
+            df[col] = df[col].apply(parse_from_string_to_numeric)
+            
+    
+    # classificando por Tipo de Investimento
+    df['Tipo de Investimento'] = df.apply(identificar_tipo, axis=1)
+    # df['Tipo de Investimento'] = df['Produto'].apply(identificar_tipo)
+
+    return df
+
 
 
 def carregar_fusoes_desdobramentos(path_csv: str) -> pd.DataFrame:
@@ -135,43 +230,25 @@ def ajustar_movimentacoes_por_eventos(df_mov: pd.DataFrame, df_eventos: pd.DataF
     df_mov.reset_index(drop=True, inplace=True)
     return df_mov
 
-def _classificar_ativo_b3(row):
-    ticker = str(row['Ticker']).upper()
-    descricao = str(row['Descrição']).upper()
 
-    # Fundos Imobiliários
-    if ticker.endswith('11') and ('FII' in descricao or 'IMOBILIÁRIO' in descricao):
-        return 'FII'
 
-    # ETFs
-    if ticker.endswith('11') and ('ETF' in descricao or 'ÍNDICE' in descricao):
-        return 'ETF'
 
-    # BDRs
-    if ticker.endswith(('34', '35', '32', '39')) or 'BDR' in descricao:
-        return 'BDR'
+def filtrar_fii(df: pd.DataFrame) -> pd.DataFrame:
 
-    # Ações ON/PN
-    if ticker.endswith('3'):
-        return 'Ação ON'
-    if ticker.endswith('4'):
-        return 'Ação PN'
+    colunas_necessarias = ['Tipo de Investimento','Tipo de Ativo']
+    if not all(col in df.columns for col in colunas_necessarias):
+        return df
 
-    # Units
-    if ticker.endswith('11') and ('UNIT' in descricao or 'UNITS' in descricao):
-        return 'Unit'
+    filtro = (df['Tipo de Ativo'] == 'FII') & (df['Tipo de Investimento'] == 'FII') & (df['Compra/Venda'])
+    df_filtrado = df[filtro]
+    return df_filtrado
 
-    # Opções
-    if len(ticker) >= 5 and ticker[-1].isdigit() and ticker[-2].isalpha():
-        return 'Opção'
+def filtrar_acoes(df: pd.DataFrame) -> pd.DataFrame:
 
-    # Renda Fixa Pública
-    if any(p in descricao for p in ['TESOURO', 'LTN', 'NTN', 'LFT']):
-        return 'Tesouro Direto'
+    colunas_necessarias = ['Tipo de Investimento','Tipo de Ativo']
+    if not all(col in df.columns for col in colunas_necessarias):
+        return df
 
-    # Renda Fixa Privada
-    if any(p in descricao for p in ['DEBENTURE', 'CRI', 'CRA', 'CDB']):
-        return 'Renda Fixa Privada'
-
-    # Fallback
-    return 'Outro'
+    filtro = (df['Tipo de Investimento'] == 'Ações') & (df['Compra/Venda'])
+    df_filtrado = df[filtro]
+    return df_filtrado
