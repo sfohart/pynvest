@@ -1,3 +1,14 @@
+# Caminho correto para o seu arquivo .env personalizado
+import pathlib
+from dotenv import load_dotenv
+# Caminho correto para o seu arquivo .env personalizado
+# Caminho absoluto para a raiz do projeto (pasta pai de app)
+root_dir = pathlib.Path(__file__).parent.parent.resolve()
+
+# Caminho completo do arquivo .env.desenvolvimento
+env_path = root_dir / ".env.desenvolvimento"
+load_dotenv(".env.desenvolvimento")
+
 from preprocessamento import (
     carregar_movimentacoes, 
     carregar_movimentacoes_streamlit,
@@ -13,6 +24,8 @@ from st_aggrid import AgGrid, GridOptionsBuilder
 import os
 import tempfile
 import pandas as pd
+
+
 
 
 from paginas import (
@@ -35,24 +48,18 @@ except locale.Error:
     except locale.Error:
         pass  # fallback se locale não estiver instalado
 
-# definindo caminho dos arquivos
-dir_dados = 'dados'
-path_segmentos_fii_status_invest = os.path.join(dir_dados, 'segmentos_fii_status_invest.csv') 
-path_planilha_b3 = os.path.join(dir_dados, 'movimentacao-b3.xlsx') 
-path_fusoes_desdobramentos = os.path.join(dir_dados, 'fusoes_desdobramentos.csv')
+
+
 
 
 # carregar as planilhas antes de usar o site
 if not st.session_state.get('upload_concluido', False):
     st.write("Dialog should appear")
-    carregar_movimentacoes_streamlit(path_fusoes_desdobramentos)
+    carregar_movimentacoes_streamlit(os.getenv('PATH_FUSOES_DESDOBRAMENTOS'))
     st.stop()
 
 df_movimentacoes = st.session_state['dados-movimentacoes']
 df_fusoes_desdobramentos = st.session_state['dados-fusoes']
-
-
-
 
 print(' ------------------------- df_movimentacoes -------------------------')
 df_movimentacoes.info()

@@ -9,7 +9,9 @@ requests
 streamlit
 streamlit_option_menu
 streamlit-aggrid
-
+streamlit-extras
 
 yfinance
 fundamentus
+
+dotenv
