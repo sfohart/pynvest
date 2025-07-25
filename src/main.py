@@ -28,14 +28,12 @@ import pandas as pd
 
 
 
-from paginas import (
-    pagina_fii,
-    pagina_acoes
+from paginas import pagina_acoes, pagina_fii
+
+from paginas.commons import (
+    obter_tema_streamlit,
+    detectar_tema_streamlit
 )
-
-from utils import carregar_css_global
-
-carregar_css_global()
 
 # Ajusta o locale para pt_BR - isso depende do seu sistema
 import locale

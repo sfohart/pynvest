@@ -63,8 +63,7 @@ def calcular_score_qualidade(fatores, pesos=dict[str,float]):
     vacancia_norm = max(0, 1 - fatores['vacancia'] / 30)  # Máx 30%
     volatilidade_norm = max(0, 1 - fatores['volatilidade'] / 50)  # Máx 50%
     liquidez_norm = min(fatores['liquidez'] / 5e6, 1) if fatores['liquidez'] > 0 else 0  # Máx R$5mi
-    
-    
+        
     # Cálculo do score
     score = (dy_norm * pesos['dy'] +
              crescimento_div_norm * pesos['dy_cagr_3a'] +

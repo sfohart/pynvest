@@ -17,7 +17,8 @@ from .fii.ranking_fii import identificar_melhores_fiis_por_setor, exibir_melhore
 df_segmentos_fii = pd.read_csv(os.getenv('PATH_SEGMENTOS_FII_STATUS_INVEST'))
 df_categorias_fii = pd.read_csv(os.getenv('PATH_CATEGORIAS_FII_STATUS_INVEST'))
 
-
+from .commons import detectar_tema_streamlit, obter_tema_streamlit
+from .commons import calcular_resumo_investimentos, exibir_resumo_investimentos
 
 ####################################################################################################################################
 # Página do streamlit
@@ -36,7 +37,8 @@ def sliders_pesos_dinamicos(pesos_iniciais):
         'p_vp':'P/VP',
         'vacancia':'Vacância',
         'volatilidade':'Volatilidade',
-        'liquidez':'Liquidez'
+        'liquidez':'Liquidez',
+        'preco_cota': 'Preço do FII'
     }
 
     def slider_alterado(changed_key):
@@ -116,16 +118,23 @@ def pagina_fii(df_fii: pd.DataFrame):
 
     # Uso exemplo com pesos padrão:
     pesos_padrao = {
-        'dy': 0.25,
-        'dy_cagr_3a': 0.2,
-        'p_vp': 0.15,
-        'vacancia': 0.15,
-        'volatilidade': 0.1,
-        'liquidez': 0.1
+        'dy': 0.3,               # Forte peso
+        'dy_cagr_3a': 0.2,       # Crescimento real importa
+        'p_vp': 0.15,            # Valuation
+        'vacancia': 0.15,        # Qualidade operacional
+        'liquidez': 0.1,         # Importante para entrar/sair
+        'volatilidade': 0.05,    # Menos importante
+        #'preco_cota': 0.05       # Marginal, se quiser manter
     }
+
 
     pesos_ajustados = sliders_pesos_dinamicos(pesos_padrao)
     segmento_nome = None
+
+    dados_consolidados = calcular_resumo_investimentos(df_fii)
+
+    with st.expander('Minha Carteira'):
+        exibir_resumo_investimentos(dados_consolidados)
     
     # Gerar painel de monitoramento
     with st.expander('Painel de Monitoramento'):        

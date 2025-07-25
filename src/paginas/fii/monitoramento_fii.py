@@ -1,11 +1,23 @@
 import streamlit as st
 import pandas as pd
 
+
+
 import plotly.graph_objects as go
 
 from .coletar_dados_status_invest import obter_dados_fii
 from .analise_fundamentalista import analise_fundamentalista_avancada
 
+
+from ..commons import (
+    detectar_tema_streamlit, 
+    obter_tema_streamlit,
+    exibir_resumo_investimentos
+)
+
+# Detecta e aplica o tema
+detectar_tema_streamlit()
+tema = obter_tema_streamlit()
 
 #@st.cache_data(show_spinner=False)
 def modelo_decisao_fii(ticker: str, pesos_indicadores: dict[str,float]):
@@ -104,15 +116,16 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
         st.warning("Nenhum dado disponível para plotar gráficos")
         return
 
-    # Detecta tema atual do Streamlit
-    tema_escuro = st.get_option("theme.base") == "dark"
+    
+    tema_escuro = tema == "dark"
+    template_plotly = "plotly_dark" if tema_escuro else "plotly_white"
 
-    # Cores para o fundo e texto dos gráficos
+    # Cores para texto e anotações
     bg_color = 'rgba(0,0,0,0)'
     text_color = '#FFF' if tema_escuro else '#000'
     annotation_bgcolor = '#333' if tema_escuro else '#FFF'
 
-    # Cores para recomendações
+    # Cores por recomendação
     cores_recomendacao = {
         'COMPRA FORTE': '#006400' if tema_escuro else 'darkgreen',
         'COMPRA': '#32CD32' if tema_escuro else 'limegreen',
@@ -125,14 +138,15 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
     def cor_por_recomendacao(r):
         return cores_recomendacao.get(r, '#007bff')
 
-    tabs = st.tabs([
+    tabs = st.tabs([        
         "Dividend Yield (%)",
         "Preço sobre Valor Patrimonial (P/VP)",
         "Score de Qualidade",
         "Pontuação Total"
     ])
 
-    # Dividend Yield
+
+    # 1. DY
     with tabs[0]:
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -150,17 +164,15 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
             annotation_bgcolor=annotation_bgcolor
         )
         fig.update_layout(
+            template=template_plotly,
             title="Dividend Yield (%) por Recomendação",
-            plot_bgcolor=bg_color,
-            paper_bgcolor=bg_color,
-            font_color=text_color,
             yaxis_title="DY (%)",
             xaxis_title="Ticker",
             margin=dict(t=40, b=40)
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # P/VP
+    # 2. P/VP
     with tabs[1]:
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -178,17 +190,15 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
             annotation_bgcolor=annotation_bgcolor
         )
         fig.update_layout(
+            template=template_plotly,
             title="Preço sobre Valor Patrimonial (P/VP)",
-            plot_bgcolor=bg_color,
-            paper_bgcolor=bg_color,
-            font_color=text_color,
             yaxis_title="P/VP",
             xaxis_title="Ticker",
             margin=dict(t=40, b=40)
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # Score de Qualidade
+    # 3. Score
     with tabs[2]:
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -206,17 +216,15 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
             annotation_bgcolor=annotation_bgcolor
         )
         fig.update_layout(
+            template=template_plotly,
             title="Score de Qualidade (0-10)",
-            plot_bgcolor=bg_color,
-            paper_bgcolor=bg_color,
-            font_color=text_color,
             yaxis_title="Score",
             xaxis_title="Ticker",
             margin=dict(t=40, b=40)
         )
         st.plotly_chart(fig, use_container_width=True)
 
-    # Pontuação Total
+    # 4. Pontuação
     with tabs[3]:
         fig = go.Figure()
         fig.add_trace(go.Bar(
@@ -226,32 +234,18 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
             text=[f"{v:.1f}" for v in df_painel['Pontuação']],
             textposition='outside'
         ))
-        fig.add_hline(
-            y=80, line_dash="dash", line_color="darkgreen",
-            annotation_text="Excelente (≥80)",
-            annotation_position="top left",
-            annotation_font_color=text_color,
-            annotation_bgcolor=annotation_bgcolor
-        )
-        fig.add_hline(
-            y=60, line_dash="dash", line_color="limegreen",
-            annotation_text="Bom (≥60)",
-            annotation_position="top left",
-            annotation_font_color=text_color,
-            annotation_bgcolor=annotation_bgcolor
-        )
-        fig.add_hline(
-            y=40, line_dash="dash", line_color="gold",
-            annotation_text="Neutro (≥40)",
-            annotation_position="top left",
-            annotation_font_color=text_color,
-            annotation_bgcolor=annotation_bgcolor
-        )
+        fig.add_hline(y=80, line_dash="dash", line_color="darkgreen",
+            annotation_text="Excelente (≥80)", annotation_position="top left",
+            annotation_font_color=text_color, annotation_bgcolor=annotation_bgcolor)
+        fig.add_hline(y=60, line_dash="dash", line_color="limegreen",
+            annotation_text="Bom (≥60)", annotation_position="top left",
+            annotation_font_color=text_color, annotation_bgcolor=annotation_bgcolor)
+        fig.add_hline(y=40, line_dash="dash", line_color="gold",
+            annotation_text="Neutro (≥40)", annotation_position="top left",
+            annotation_font_color=text_color, annotation_bgcolor=annotation_bgcolor)
         fig.update_layout(
+            template=template_plotly,
             title="Pontuação Total (0-100)",
-            plot_bgcolor=bg_color,
-            paper_bgcolor=bg_color,
-            font_color=text_color,
             yaxis_title="Pontuação",
             xaxis_title="Ticker",
             margin=dict(t=40, b=40)
@@ -260,4 +254,3 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
 
     with st.expander('Dados utilizados', expanded=False):
         st.dataframe(df_painel)
-

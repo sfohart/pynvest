@@ -4,6 +4,7 @@ import pandas as pd
 from .coletar_dados_status_invest import obter_dados_fii
 from .analise_fundamentalista import analise_fundamentalista_avancada
 
+@st.cache_data(show_spinner=False)
 def analise_setorial(df_tickers_setor: pd.DataFrame, pesos_ajustados: dict[str, float]):
     """Compara FIIs do mesmo segmento"""
     if df_tickers_setor.empty:
