@@ -139,11 +139,59 @@ def extrair_dy_cagr_5y(soup: BeautifulSoup) -> float | None:
     except Exception:
         return None
 
+def extrair_segmento(soup: BeautifulSoup) -> str | None:
+    try:
+        span = soup.find("span", string=lambda s: s and "Segmento" in s)
+        valor = span.find_next("strong", class_="value").text.strip()
+        return valor
+    except Exception:
+        return None
+
+def extrair_tipo_gestao(soup: BeautifulSoup) -> str | None:
+    try:
+        span = soup.find("span", string=lambda s: s and "Tipo da gestão" in s)
+        valor = span.find_next("strong", class_="value").text.strip()
+        return valor
+    except Exception:
+        return None
+
+def extrair_publico_alvo(soup: BeautifulSoup) -> str | None:
+    try:
+        span = soup.find("span", string=lambda s: s and "Público-alvo" in s)
+        valor = span.find_next("strong", class_="value").text.strip()
+        return valor
+    except Exception:
+        return None
+
+
 
 @st.cache_data(show_spinner=False)
 def obter_dados_fii(ticker_fii: str) -> dict[str,any]:
+
+    dados_mercado = None
+    dados_fundamentos = {}
+
+    try:
+        # Coleta dados de mercado via Yahoo
+        fii_yf = yf.Ticker(f'{ticker_fii}.SA')
+        hist = fii_yf.history(period='3y')
+
+        if hist.empty:
+            raise ValueError(f"Não há dados históricos para {ticker_fii}")
+
+        dados_mercado = {
+            'hist_precos': hist,
+            'dividendos': fii_yf.dividends,
+            'ultimo_preco': hist['Close'].iloc[-1],
+            'volume_medio': hist['Volume'].mean()
+        }
+    except Exception as e:
+        print(f"Erro ao coletar dados de mercado para {ticker_fii}: {str(e)}")
+
+
     soup = obter_soup(ticker_fii)
-    return {
+
+    dados_fundamentos = {
         "ticker": ticker_fii.upper(),
         "valor_atual": extrair_valor_atual(soup),
         "dividend_yield_12m": extrair_dy_12m(soup),
@@ -160,6 +208,15 @@ def obter_dados_fii(ticker_fii: str) -> dict[str,any]:
         "valorizacao_mensal": extrair_valorizacao_mensal(soup),
         "dy_cagr_3y": extrair_dy_cagr_3y(soup),
         "dy_cagr_5y": extrair_dy_cagr_5y(soup),
+        "segmento": extrair_segmento(soup),
+        "tipo_gestao": extrair_tipo_gestao(soup),
+        "publico_alvo": extrair_publico_alvo(soup)
+    }
+
+    return {
+        'mercado': dados_mercado,
+        'fundamentos': dados_fundamentos,
+        'info': fii_yf.info if 'fii_yf' in locals() else {}            
     }
 
 

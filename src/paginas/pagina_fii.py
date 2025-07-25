@@ -2,15 +2,13 @@ import pandas as pd
 import streamlit as st
 import os
 
-from .fii.coletar_dados_status_invest import (
-    obter_dados_fii,
-    obter_fiis_por_categoria_segmento
-)
+
 
 from .fii.analise_fundamentalista import analise_fundamentalista_avancada
 from .fii.analise_setorial import analise_setorial
 from .fii.monitoramento_fii import painel_monitoramento, exibir_painel_monitoramento
 from .fii.ranking_fii import identificar_melhores_fiis_por_setor, exibir_melhores_fiis
+from .fii.resumo_investimentos import exibir_resumo_investimentos_fii
 
 
 
@@ -18,7 +16,8 @@ df_segmentos_fii = pd.read_csv(os.getenv('PATH_SEGMENTOS_FII_STATUS_INVEST'))
 df_categorias_fii = pd.read_csv(os.getenv('PATH_CATEGORIAS_FII_STATUS_INVEST'))
 
 from .commons import detectar_tema_streamlit, obter_tema_streamlit
-from .commons import calcular_resumo_investimentos, exibir_resumo_investimentos
+from .commons import calcular_resumo_investimentos
+
 
 ####################################################################################################################################
 # Página do streamlit
@@ -127,14 +126,13 @@ def pagina_fii(df_fii: pd.DataFrame):
         #'preco_cota': 0.05       # Marginal, se quiser manter
     }
 
-
     pesos_ajustados = sliders_pesos_dinamicos(pesos_padrao)
     segmento_nome = None
 
     dados_consolidados = calcular_resumo_investimentos(df_fii)
 
     with st.expander('Minha Carteira'):
-        exibir_resumo_investimentos(dados_consolidados)
+        exibir_resumo_investimentos_fii(dados_consolidados)
     
     # Gerar painel de monitoramento
     with st.expander('Painel de Monitoramento'):        

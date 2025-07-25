@@ -7,12 +7,11 @@ import plotly.graph_objects as go
 
 from .coletar_dados_status_invest import obter_dados_fii
 from .analise_fundamentalista import analise_fundamentalista_avancada
-
+from .analise_tecnica import exibir_analise_tecnica
 
 from ..commons import (
     detectar_tema_streamlit, 
     obter_tema_streamlit,
-    exibir_resumo_investimentos
 )
 
 # Detecta e aplica o tema
@@ -26,8 +25,12 @@ def modelo_decisao_fii(ticker: str, pesos_indicadores: dict[str,float]):
     if not dados:
         return None
     
+    if ('fundamentos' not in dados.keys()):
+        st.error(f'Não foi possível encontrar dados fundamentalistas para {ticker}')
+        return
+
     try:
-        analise_fund = analise_fundamentalista_avancada(ticker, dados, pesos_indicadores)
+        analise_fund = analise_fundamentalista_avancada(ticker, dados['fundamentos'], pesos_indicadores)
         if analise_fund is None or analise_fund.empty:
             return None
             
@@ -142,7 +145,8 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
         "Dividend Yield (%)",
         "Preço sobre Valor Patrimonial (P/VP)",
         "Score de Qualidade",
-        "Pontuação Total"
+        "Pontuação Total",
+        "Análise Técnica"
     ])
 
 
@@ -251,6 +255,9 @@ def exibir_painel_monitoramento(df_painel: pd.DataFrame):
             margin=dict(t=40, b=40)
         )
         st.plotly_chart(fig, use_container_width=True)
+    with tabs[4]:
+        lista_fiis = df_painel['Ticker'].unique()
+        exibir_analise_tecnica(lista_fiis)
 
     with st.expander('Dados utilizados', expanded=False):
         st.dataframe(df_painel)

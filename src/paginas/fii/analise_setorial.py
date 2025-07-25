@@ -16,8 +16,8 @@ def analise_setorial(df_tickers_setor: pd.DataFrame, pesos_ajustados: dict[str, 
 
     for i, ticker in enumerate(df_tickers_setor['ticker'].values, 1):    
         dados = obter_dados_fii(ticker)
-        if dados:
-            analise = analise_fundamentalista_avancada(ticker,dados, pesos_ajustados)
+        if (dados is not None) and ('fundamentos' in dados.keys()):
+            analise = analise_fundamentalista_avancada(ticker,dados['fundamentos'], pesos_ajustados)
             if analise is not None:
                 df_analise = analise.T  # ✅ Transforma colunas em colunas da linha
                 df_analise['setor'] = dados.get('setor','Desconhecido')

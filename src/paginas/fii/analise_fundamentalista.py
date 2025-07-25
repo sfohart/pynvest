@@ -5,20 +5,20 @@ from src.utils import parse_currency, parse_percent
 
 
 @st.cache_data(show_spinner=False)
-def analise_fundamentalista_avancada(ticker: str, dados: dict[str,any], pesos_ajustados: dict[str, float]):
-    if not dados:
+def analise_fundamentalista_avancada(ticker: str, dados_fundamentalistas: dict[str,any], pesos_ajustados: dict[str, float]):
+    if not dados_fundamentalistas:
         return None
     
-    preco = parse_currency(dados.get('valor_atual', 0))
-    p_vp = float(dados.get('pvp', 0) or 0)
-    dy = parse_percent(dados.get('dividend_yield_12m', 0))
+    preco = parse_currency(dados_fundamentalistas.get('valor_atual', 0))
+    p_vp = float(dados_fundamentalistas.get('pvp', 0) or 0)
+    dy = parse_percent(dados_fundamentalistas.get('dividend_yield_12m', 0))
     vacancia = 0.0  # não disponível, definir default
-    patrimonio = parse_currency(dados.get('patrimonio_total', 0))
-    n_cotistas = int(dados.get('numero_cotistas', 0) or 0)  # usando cotistas como proxy
-    liquidez = parse_currency(dados.get('liquidez_media_diaria', 0))
+    patrimonio = parse_currency(dados_fundamentalistas.get('patrimonio_total', 0))
+    n_cotistas = int(dados_fundamentalistas.get('numero_cotistas', 0) or 0)  # usando cotistas como proxy
+    liquidez = parse_currency(dados_fundamentalistas.get('liquidez_media_diaria', 0))
     tx_adm = 0.0  # não disponível, default 0
     ultimo_rendimento = 0.0  # não disponível, default 0
-    dy_cagr_3a = float(dados.get('dy_cagr_3y', 0) or 0)
+    dy_cagr_3a = float(dados_fundamentalistas.get('dy_cagr_3y', 0) or 0)
     crescimento_div = dy_cagr_3a
     volatilidade = 0.0  # não disponível, default 0
     

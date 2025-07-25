@@ -51,7 +51,8 @@ def exibir_analise_tecnica(carteira: list[str]):
 
     try:
         dados = obter_dados_fii(ticker)  # dicionário com ['mercado']['hist_precos']
-        hist = analise_tecnica(dados)  # DataFrame com indicadores técnicos
+        if (dados is not None) and ('mercado' in dados.keys()):
+            hist = analise_tecnica(dados)  # DataFrame com indicadores técnicos
     except Exception as e:
         st.error(f"Erro ao obter análise técnica para {ticker}: {str(e)}")
         return
@@ -109,12 +110,16 @@ def exibir_analise_tecnica(carteira: list[str]):
 
         st.plotly_chart(fig1, use_container_width=True)
 
+        # st.markdown(f"""
+        #     **Bandas de Bollinger:** indicam volatilidade e possíveis pontos de reversão.  
+        #     --- 
+        #     <a href="https://www.investopedia.com/terms/b/bollingerbands.asp" target="_blank" style="color:#1E90FF;">Veja mais</a> na Investopedia.
+        
+        # """)
         st.markdown(f"""
-        <div style="color:{text_color}; font-size:14px; margin-top:10px;">
-            <b>Bandas de Bollinger:</b> indicam volatilidade e possíveis pontos de reversão.  
-            <a href="https://www.investopedia.com/terms/b/bollingerbands.asp" target="_blank" style="color:#1E90FF;">Veja mais</a> na Investopedia.
-        </div>
-        """, unsafe_allow_html=True)
+            **Bandas de Bollinger:** indicam volatilidade e possíveis pontos de reversão. 
+            Veja [Investopedia - Bollinger Bands](https://www.investopedia.com/terms/b/bollingerbands.asp) para mais detalhes.
+            """)
 
     # Aba 2: RSI e MACD
     with abas[1]:
