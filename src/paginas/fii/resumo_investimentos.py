@@ -6,7 +6,6 @@ import plotly.graph_objects as go
 import pandas as pd
 
 from ..commons import calcular_resumo_investimentos, grafico_patrimonio_donut
-from .analise_tecnica import analise_tecnica, exibir_analise_tecnica
 
 
 def grafico_historico_precos_fii(dados):

@@ -10,8 +10,6 @@ from .fii.monitoramento_fii import painel_monitoramento, exibir_painel_monitoram
 from .fii.ranking_fii import identificar_melhores_fiis_por_setor, exibir_melhores_fiis
 from .fii.resumo_investimentos import exibir_resumo_investimentos_fii
 
-
-
 df_segmentos_fii = pd.read_csv(os.getenv('PATH_SEGMENTOS_FII_STATUS_INVEST'))
 df_categorias_fii = pd.read_csv(os.getenv('PATH_CATEGORIAS_FII_STATUS_INVEST'))
 
